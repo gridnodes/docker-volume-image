@@ -24,6 +24,16 @@ import flask
 import json
 
 
+class VolumeNotFoundError(Exception):
+    """
+    Exception class for volumes not found.
+
+    This exception is raised, if a volume is accessed, which is not known to the
+    internal volume database.
+    """
+    pass
+
+
 class volumeDB():
     """
     Manage the volume data in a persistent storage.
@@ -82,6 +92,25 @@ class volumeDB():
                 json.dump(self._data, file, indent=4)
 
 
+def getVolume(name: str) -> dict:
+    """
+    Get the specification of for a volume.
+
+
+    :param name: The volume to be looked up.
+
+    :returns: The volume specification as dictionary.
+
+    :raises VolumeNotFoundError: If the volume can't be found in the internal
+        volume database, an exception will be raised.
+    """
+    try:
+        with volumeDB() as volumes:
+            return volumes[name]
+    except KeyError as e:
+        raise VolumeNotFoundError from e
+
+
 def request() -> dict:
     """
     Get the JSON request body.
@@ -137,6 +166,22 @@ def errorResponse(message: str, status: int = 400) -> flask.wrappers.Response:
 # Create a new flask app, which will be used to handle the routes defined below
 # and provides additional methods and decorators.
 app = flask.Flask(__name__)
+
+
+@app.errorhandler(VolumeNotFoundError)
+def handleVolumeNotFound(error: VolumeNotFoundError):
+    """
+    Exception handler for :py:class:`VolumeNotFoundError`.
+
+    This exception handler generates an error response indicating that a given
+    volume being accessed is not known to the internal volume database.
+
+
+    :param error: The :py:class:`VolumeNotFoundError` exception to be handled.
+
+    :returns: A HTTP not found error response.
+    """
+    return errorResponse(f'volume {error} not found', 404)
 
 
 @app.route('/Plugin.Activate', methods=['POST'])
@@ -229,12 +274,6 @@ def volumeCreate():
         return errorResponse(f'missing option {e}')
 
     with volumeDB(True) as volumes:
-        # Check, if the volume is already defined in the internal database to
-        # avoid existing configurations being overwritten. The Docker daemon
-        # has no check included to avoid this behavior.
-        if data['name'] in volumes:
-            return errorResponse('volume already exists')
-
         # Add the new volume configuration to the internal volume database, so
         # it is accessible for later use in other routes in subsequent requests.
         # An empty response will be returned to inform the Docker daemon about
@@ -243,6 +282,60 @@ def volumeCreate():
             'image': data['image']
         }
         return response()
+
+
+@app.route('/VolumeDriver.Remove', methods=['POST'])
+def volumeRemove():
+    """
+    Remove a volume.
+
+    This route removes a previously created volume from the internal volume
+    database.
+
+
+    :returns: If the volume has been successfully removed, an empty response
+        will be returned.
+    """
+    volName = request()['Name']
+
+    # Open the volume database with write access and remove the given volume. An
+    # empty response will be returned to inform the Docker daemon about
+    # successfully removing the volume.
+    #
+    # NOTE: If the volume is not existent, no error will be thrown, as it seems
+    #       to be removed already - which is what this route should do.
+    with volumeDB(True) as volumes:
+        with contextlib.suppress(KeyError):
+            volumes.pop(volName, None)
+            return response()
+
+
+@app.route('/VolumeDriver.Get', methods=['POST'])
+def volumeGet():
+    """
+    Get informations about a volume.
+
+    This route get's informations about a specific volume of the internal volume
+    database. This information is required in various steps of the volume
+    workflow, most noticeable in the `volume inspect` command.
+
+
+    :returns: Detailed information about the given volume.
+
+    :raises VolumeNotFoundError: The given volume could not be found. See the
+        :py:ref:`handleVolumeNotFound` exception handler for details.
+    """
+    # Get the passed volume name from the request body and look it up in the
+    # internal volume database. There's no check, if the volume exists, as the
+    # raised exception is handled automatically by an exception handler.
+    volName = request()['Name']
+    volData = getVolume(volName)
+
+    return response({
+        'Volume': {
+            'Name': volName
+        }
+    })
 
 
 # If this script is executed as application or loaded as main python script, run
