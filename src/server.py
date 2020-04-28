@@ -374,6 +374,29 @@ def volumeGet():
     })
 
 
+@app.route('/VolumeDriver.List', methods=['POST'])
+def volumeList():
+    """
+    Get a list of all volumes.
+
+    This route generates a list of all volumes configured in this plugin and
+    their mount paths, if available.
+
+
+    :returns: A list of all volumes.
+    """
+    with volumeDB() as volumes:
+        return response({
+            'Volumes': list(map(
+                lambda volName: {
+                    'Name':       volName,
+                    'Mountpoint': getVolumePath(volName, True)
+                },
+                volumes
+            ))
+        })
+
+
 # If this script is executed as application or loaded as main python script, run
 # a simple web server to run the flask app.
 if __name__ == "__main__":
