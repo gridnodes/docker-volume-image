@@ -216,6 +216,23 @@ def handleVolumeNotFound(error: VolumeNotFoundError):
     return errorResponse(f'volume {error} not found', 404)
 
 
+@app.errorhandler(docker.errors.APIError)
+def handleVolumeNotFound(error: docker.errors.APIError):
+    """
+    Exception handler for :py:class:`docker.errors.APIError`.
+
+    This exception handler generates an error response for all errors related to
+    Docker. As these are server-side errors, these get a status 500 code, even
+    if its a configuration related error (i.e. unknown image name).
+
+
+    :param error: The exception to be handled.
+
+    :returns: A HTTP server side error response.
+    """
+    return errorResponse(error.explanation, 500)
+
+
 @app.route('/Plugin.Activate', methods=['POST'])
 def pluginActivate():
     """
@@ -395,6 +412,46 @@ def volumeList():
                 volumes
             ))
         })
+
+
+@app.route('/VolumeDriver.Mount', methods=['POST'])
+@app.route('/VolumeDriver.Path',  methods=['POST'])
+def volumeMount():
+    """
+    Mount the volume.
+
+    This route gets the path of an image related to a specific volume to be
+    mounted in the container to be started.
+
+    .. note:: As this plugin provides existing paths of Docker images only, no
+        actual mounting will be done by processing this route.
+
+
+    :returns: The path to be mounted.
+    """
+    # Get the passed volume name from the request body and get the path to be
+    # mounted from the related image.
+    volName = request()['Name']
+    volPath = getVolumePath(volName)
+
+    return response({
+        'Mountpoint': volPath
+    })
+
+
+@app.route('/VolumeDriver.Unmount', methods=['POST'])
+def volumeUnmount():
+    """
+    Unmount the volume.
+
+    This route is called on volume unmount. However, as this plugin provides
+    existing paths of the Docker images only, no additional steps need to be
+    performed and an empty response can be returned always.
+
+
+    :returns: An empty response.
+    """
+    return response()
 
 
 # If this script is executed as application or loaded as main python script, run
