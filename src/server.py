@@ -20,6 +20,7 @@
 # Copyright (C) 2020 mksec <support@mksec.de>
 
 import contextlib
+import docker
 import flask
 import json
 
@@ -109,6 +110,30 @@ def getVolume(name: str) -> dict:
             return volumes[name]
     except KeyError as e:
         raise VolumeNotFoundError from e
+
+
+def getVolumePath(name: str) -> str:
+    """
+    Get the path of a specific volume.
+
+    This function gets the path of a specific image of the local docker daemon,
+    so it can be mounted as volume.
+
+    .. note:: This function returns just the uppermost layer of images, but not
+        the paths of the underlaying layers. For most use cases this should be
+        sufficient, as the application data shared between containers often is
+        contained in the uppermost layer.
+
+
+    :param name: The image to be mounted.
+
+    :returns: The path to be mounted as volume.
+
+    :raises docker.errors.ImageNotFound: The image `name` couldn't be found.
+    """
+    vol = getVolume(name)
+    img = docker.from_env().images.get(vol['image'])
+    return img.attrs['GraphDriver']['Data']['UpperDir']
 
 
 def request() -> dict:
@@ -328,12 +353,18 @@ def volumeGet():
     # Get the passed volume name from the request body and look it up in the
     # internal volume database. There's no check, if the volume exists, as the
     # raised exception is handled automatically by an exception handler.
-    volName = request()['Name']
-    volData = getVolume(volName)
+    #
+    # NOTE: If the related docker image can't be found, no error is thrown, as
+    #       there's no need to pull it before it needs to be mounted.
+    volPath = ''
+    with contextlib.suppress(docker.errors.ImageNotFound):
+        volName = request()['Name']
+        volPath = getVolumePath(volName)
 
     return response({
         'Volume': {
-            'Name': volName
+            'Name':       volName,
+            'Mountpoint': volPath
         }
     })
 
