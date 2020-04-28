@@ -112,7 +112,7 @@ def getVolume(name: str) -> dict:
         raise VolumeNotFoundError from e
 
 
-def getVolumePath(name: str) -> str:
+def getVolumePath(name: str, supress: bool = False) -> str:
     """
     Get the path of a specific volume.
 
@@ -126,14 +126,21 @@ def getVolumePath(name: str) -> str:
 
 
     :param name: The image to be mounted.
+    :param suppress: If :py:class:`True`, no exception is raised, if the image
+        is not available in the local Docker daemon.
 
-    :returns: The path to be mounted as volume.
+    :returns: The path to be mounted as volume. If `suppress` is enabled and the
+        image can't be found, :py:class:`None` will be returned.
 
     :raises docker.errors.ImageNotFound: The image `name` couldn't be found.
     """
-    vol = getVolume(name)
-    img = docker.from_env().images.get(vol['image'])
-    return img.attrs['GraphDriver']['Data']['UpperDir']
+    # A context manager will be used to conditionally suppress the exception
+    # thrown, if the related Docker image can't be found by either suppressing
+    # just the Docker exception or an empty tuple (no exceptions).
+    with contextlib.suppress(docker.errors.ImageNotFound if supress else ()):
+        vol = getVolume(name)
+        img = docker.from_env().images.get(vol['image'])
+        return img.attrs['GraphDriver']['Data']['UpperDir']
 
 
 def request() -> dict:
@@ -356,10 +363,8 @@ def volumeGet():
     #
     # NOTE: If the related docker image can't be found, no error is thrown, as
     #       there's no need to pull it before it needs to be mounted.
-    volPath = ''
-    with contextlib.suppress(docker.errors.ImageNotFound):
-        volName = request()['Name']
-        volPath = getVolumePath(volName)
+    volName = request()['Name']
+    volPath = getVolumePath(volName, True)
 
     return response({
         'Volume': {
