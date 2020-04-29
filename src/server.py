@@ -434,8 +434,19 @@ def volumeMount():
     volName = request()['Name']
     volPath = getVolumePath(volName)
 
+    # Get the filesystem root to get the prefix for Docker volume paths. This is
+    # required, as the v2 volume plugin API requires plugins to mount the volume
+    # in a dedicated folder instead of granting full filesystem access. By
+    # prefixing the path with '/..', the PropagatedMount path will be bypassed
+    # and the real filesystem root accessed.
+    rootDir = docker.from_env().info()['DockerRootDir']
+    volRoot = '/'.join(map(
+        lambda x: '..' if x else '',
+        (rootDir + '/plugins/pluginID/rootfs').split('/')
+    ))
+
     return response({
-        'Mountpoint': volPath
+        'Mountpoint': volRoot + volPath
     })
 
 
