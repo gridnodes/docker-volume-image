@@ -88,9 +88,39 @@ class volumeDB():
         has been raised and the context was entered for write-access, the
         current database will be saved into the JSON file.
         """
+
+        def cleanupDict(src):
+            """
+            Cleanup a dictionary.
+
+            This function cleans up a dictionary by removing all keys having
+            :py:class:`None` as value. Although this doesn't change the
+            functionality of this application, it will be used for minifying the
+            resulting JSON data to be dumped.
+
+            .. warning:: This function alters the input dictionary. To keep the
+                original state, the input dictionary should be copied first
+                before passing the copied one to this function.
+
+
+            :param src: The dictionary to be cleaned up.
+
+            :returns: The cleaned up dictionary.
+            """
+            # The following code is based on a stackoverflow answer, licensed
+            # under the terms of the MIT license.
+            #
+            #   https://stackoverflow.com/a/4256027
+            for key, value in list(src.items()):
+                if value is None:
+                    del src[key]
+                elif isinstance(value, dict):
+                    cleanupDict(value)
+            return src
+
         if self._write and not exc_type:
             with open(self._file, 'w') as file:
-                json.dump(self._data, file, indent=4)
+                json.dump(cleanupDict(self._data), file, indent=4)
 
 
 def getVolume(name: str) -> dict:
@@ -140,7 +170,13 @@ def getVolumePath(name: str, supress: bool = False) -> str:
     with contextlib.suppress(docker.errors.ImageNotFound if supress else ()):
         vol = getVolume(name)
         img = docker.from_env().images.get(vol['image'])
-        return img.attrs['GraphDriver']['Data']['UpperDir']
+
+        # Get the path of the linked docker image and the optional subdirectory
+        # to be mounted. Both will be used to get the full mount path to be used
+        # as volume and returned as string.
+        imgPath = img.attrs['GraphDriver']['Data']['UpperDir']
+        volPath = vol.get('path')
+        return imgPath + (('/' + volPath) if volPath else '')
 
 
 def request() -> dict:
@@ -311,7 +347,10 @@ def volumeCreate():
         req = request()
         data = {
             'name': req['Name'],
-            'image': imageName(req['Opts']['image'])
+            'image': imageName(req['Opts']['image']),
+
+            # optional parameters
+            'path': req['Opts'].get('path')
         }
     except KeyError as e:
         # If a mandatory option for this volume plugin is not set, an error
@@ -328,7 +367,8 @@ def volumeCreate():
         # An empty response will be returned to inform the Docker daemon about
         # successfully creating the volume.
         volumes[data['name']] = {
-            'image': data['image']
+            'image': data['image'],
+            'path':  data['path']
         }
         return response()
 
