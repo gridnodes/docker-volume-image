@@ -17,11 +17,24 @@
 #
 # Copyright (C) 2020 mksec <support@mksec.de>
 
-# Ignore the python bytecode cache.
-__pycache__
+# This Makefile was inspired by the one provided with the Docker volume plugin
+# for sshFS, which is licensed under the MIT license. Its source can be obtained
+# from https://github.com/vieux/docker-volume-sshfs.
 
-# Ignore the build directory. For git, this path is ignored in most client
-# settings. However, as this file will also be used by Docker, it gets
-# blacklisted explictly to avoid the entire build directory being copied into
-# the build context.
-/build
+PLUGIN_NAME = gridnodes/image
+PLUGIN_TAG ?= next
+
+
+all: rootfs create
+
+rootfs:
+	docker build -t ${PLUGIN_NAME}:rootfs .
+	mkdir -p ./build/rootfs
+	docker create --name tmp ${PLUGIN_NAME}:rootfs >/dev/null
+	docker export tmp | tar -x -C ./build/rootfs
+	docker rm -vf tmp >/dev/null
+	cp config.json ./build
+
+create:
+	docker plugin rm -f ${PLUGIN_NAME}:${PLUGIN_TAG} >&/dev/null || true
+	docker plugin create ${PLUGIN_NAME}:${PLUGIN_TAG} ./build

@@ -59,7 +59,7 @@ class volumeDB():
             contents will be dumped back to the JSON file on exit.
         """
         self._data = {}
-        self._file = 'volumes.json'
+        self._file = '/mnt/state/volumes.json'
 
         self._write = writable
 

@@ -17,11 +17,11 @@
 #
 # Copyright (C) 2020 mksec <support@mksec.de>
 
-# Ignore the python bytecode cache.
-__pycache__
+FROM python:3-alpine
 
-# Ignore the build directory. For git, this path is ignored in most client
-# settings. However, as this file will also be used by Docker, it gets
-# blacklisted explictly to avoid the entire build directory being copied into
-# the build context.
-/build
+# This image just contains the required python application and its dependencies.
+#
+# TODO: At the moment, there is no optimization for reducing the image size.
+#       These should be added to provide a small docker plugin image.
+RUN  pip install docker flask gunicorn
+COPY src/ /plugin

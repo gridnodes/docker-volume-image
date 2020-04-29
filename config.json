@@ -1,0 +1,44 @@
+{
+    "description": "image volumes plugin for Docker",
+    "documentation": "https://github.com/gridnodes/docker-volume-image",
+
+    "interface" : {
+           "types": ["docker.volumedriver/1.0"],
+           "socket": "volume-image.sock"
+    },
+
+    "workdir": "/plugin",
+    "entrypoint": [
+        "gunicorn",
+        "-b", "unix:/run/docker/plugins/volume-image.sock",
+        "server:app"
+    ],
+
+    "mounts": [
+        {
+            "destination": "/var/run/docker.sock",
+            "options": [
+                "rbind"
+            ],
+            "name": "docker",
+            "source": "/var/run/docker.sock",
+            "type": "bind"
+        },
+        {
+            "destination": "/mnt/state",
+            "options": [
+                "rbind"
+            ],
+            "name": "state",
+            "source": "/var/lib/docker/plugins/",
+            "settable": [
+                "source"
+            ],
+            "type": "bind"
+        }
+      ],
+
+    "network": {
+        "type": "none"
+    }
+}
