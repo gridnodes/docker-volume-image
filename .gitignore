@@ -18,7 +18,7 @@
 # Copyright (C) 2020 mksec <support@mksec.de>
 
 # Ignore the python bytecode cache.
-__pycache__
+**/__pycache__
 
 # Ignore the build directory. For git, this path is ignored in most client
 # settings. However, as this file will also be used by Docker, it gets
