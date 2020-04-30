@@ -23,6 +23,7 @@ import contextlib
 import docker
 import flask
 import json
+import os
 
 
 class VolumeNotFoundError(Exception):
@@ -59,7 +60,7 @@ class volumeDB():
             contents will be dumped back to the JSON file on exit.
         """
         self._data = {}
-        self._file = '/mnt/state/volumes.json'
+        self._file = os.getenv('STATE_FILE', '/mnt/state/volume-image.json')
 
         self._write = writable
 
