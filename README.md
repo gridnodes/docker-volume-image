@@ -2,6 +2,8 @@
 
 [![](https://img.shields.io/github/issues-raw/gridnodes/docker-volume-image.svg?style=flat-square)](https://github.com/gridnodes/docker-volume-image/issues)
 [![](https://img.shields.io/badge/license-GPLv3+-blue.svg?style=flat-square)](LICENSE)
+[![Docker Pulls](https://img.shields.io/docker/pulls/gridnodes/image.svg?style=flat-square)](https://hub.docker.com/r/gridnodes/image)
+
 
 When deploying an application with Docker, it may require several containers
 running from different images for different purposes. However, in some
@@ -14,6 +16,28 @@ image will be customized to the application, the default installation is often
 sufficient for nginx. This volume plugin gives you the ability to share the
 source code of your PHP application image with a default nginx container and
 thus doesn't require a custom build nginx image anymore.
+
+
+## Installation
+
+For `x86_64` architecture this plugin is available on Docker Hub and can be
+installed via Docker CLI:
+
+```
+docker plugin install gridnodes/image
+```
+
+#### Manual installation
+
+For platforms other than `x86_64`, a manual build of this plugin needs to be
+performed. The `make` utility will be used for convenience, but no additional
+dependencies are required. To install this plugin, just download its latest
+sources and use the following command in the downloaded folder:
+
+```
+cd docker-volume-image-master
+make all enable PLUGIN_TAG=latest
+```
 
 
 ## Usage

@@ -38,3 +38,6 @@ rootfs:
 create:
 	docker plugin rm -f ${PLUGIN_NAME}:${PLUGIN_TAG} >/dev/null 2>&1 || true
 	docker plugin create ${PLUGIN_NAME}:${PLUGIN_TAG} ./build
+
+enable:
+	docker plugin enable ${PLUGIN_NAME}:${PLUGIN_TAG}
