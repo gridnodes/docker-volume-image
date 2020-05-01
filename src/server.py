@@ -24,6 +24,7 @@ import docker
 import flask
 import json
 import os
+import portalocker
 
 
 class VolumeNotFoundError(Exception):
@@ -36,7 +37,7 @@ class VolumeNotFoundError(Exception):
     pass
 
 
-class volumeDB():
+class volumeDB(portalocker.Lock):
     """
     Manage the volume data in a persistent storage.
 
@@ -46,8 +47,6 @@ class volumeDB():
     which will automatically stored and restored from a JSON file to ensure this
     data is available not only for subsequent requests but also after a restart
     of the plugin.
-
-    .. todo:: This context manager needs to be made thread safe.
     """
 
     def __init__(self, writable=False):
@@ -61,23 +60,39 @@ class volumeDB():
         """
         self._data = {}
         self._file = os.getenv('STATE_FILE', '/mnt/state/volume-image.json')
-
         self._write = writable
+
+        # Initialize the file lock for the given state file. For write-access
+        # the 'a+' mode will be used to dynamically create the file, if its not
+        # existent yet.
+        #
+        # NOTE: For write-access 'w+' can't be used, as the file contents need
+        #       to be loaded first before saving the altered state.
+        super().__init__(self._file, mode=('a+' if self._write else 'r'))
 
     def __enter__(self) -> dict:
         """
         Enter the context.
 
-        This method enteres the context and loads the contents of the volume
+        This method enters the context and loads the contents of the volume
         database file. A reference to this database will be returned, so the
         application can use and alter this data.
 
 
         :returns: The volume database as dictionary.
         """
-        with contextlib.suppress(FileNotFoundError):
-            with open(self._file) as file:
-                self._data = json.load(file)
+        # If the persistent database file already exists, acquire the protective
+        # lock and open the file. For write-access this is also required to
+        # initially create the file and lock it.
+        if os.path.exists(self._file) or self._write:
+            self.acquire()
+
+            # If the file is initially created, it's empty. However, the JSON
+            # parser doesn't allow empty files to be loaded. Therefore the
+            # following check will ensure to parse non-empty files only.
+            if os.fstat(self.fh.fileno()).st_size > 0:
+                self.fh.seek(0)
+                self._data = json.load(self.fh)
 
         return self._data
 
@@ -119,9 +134,20 @@ class volumeDB():
                     cleanupDict(value)
             return src
 
+        # If the volume database is opened in write-access mode and no exception
+        # occurred, persist the current database to the state file as JSON.
+        #
+        # NOTE: As the file is opened in 'a+' mode for write-access to read its
+        #       contents first, a manual seek and truncate needs to be performed
+        #       before writing the data.
         if self._write and not exc_type:
-            with open(self._file, 'w') as file:
-                json.dump(cleanupDict(self._data), file, indent=4)
+            self.fh.seek(0)
+            self.fh.truncate(0)
+            json.dump(cleanupDict(self._data), self.fh, indent=4)
+
+        # Release previously acquired locks and close opened file handles before
+        # exiting the context.
+        self.release()
 
 
 def getVolume(name: str) -> dict:

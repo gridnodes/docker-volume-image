@@ -23,5 +23,5 @@ FROM python:3-alpine
 #
 # TODO: At the moment, there is no optimization for reducing the image size.
 #       These should be added to provide a small docker plugin image.
-RUN  pip install docker flask gunicorn
+RUN  pip install docker flask gunicorn portalocker
 COPY src/ /plugin
