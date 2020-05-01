@@ -11,11 +11,19 @@ situations it is required to share parts of an image in a second one.
 
 For example, consider a simple web application provided with PHP and nginx:
 Usually, the source code of the application needs to be mounted in both
-containers or copied into a custom image for both PHP and nginx. While the PHP
-image will be customized to the application, the default installation is often
-sufficient for nginx. This volume plugin gives you the ability to share the
-source code of your PHP application image with a default nginx container and
-thus doesn't require a custom build nginx image anymore.
+containers or copied into a custom image for both PHP and nginx. However, both
+approaches have downsides: The first one doesn't scale for large deployments, as
+you need to manually update the sources outside the container for each
+deployment. For the later a customized image is required for all containers and
+thus no automatic security updates can be used from upstream without rebuilding
+the custom images first.
+
+While it might be suitable to have a custom PHP image including all necessary
+dependencies for the application, the default installation is sufficient for
+nginx in many cases, as it just serves assets or passes the request to PHP. This
+volume plugin gives you the ability to share the source code of your PHP
+application image with a default nginx container and thus doesn't require a
+custom build nginx image anymore.
 
 
 ## Installation
